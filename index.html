@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17261f">
+  <meta name="description" content="A quiet, explorable ryokan above a forest valley. A small browser game made from the Komorebi Blender environment.">
+  <title>Komorebi — A quiet departure</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317261f'/%3E%3Cpath d='M32 10v44M16 23h32M12 46l20-23 20 23' stroke='%23e8d7ad' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body>
+  <canvas id="world" tabindex="0" aria-label="Interactive three-dimensional ryokan"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <header><a class="wordmark" href="./" aria-label="Komorebi home">KOMOREBI <span>木漏れ日</span></a><span class="edition">A QUIET DEPARTURE</span><button id="pause-button" class="glass" hidden>Pause <kbd>Esc</kbd></button></header>
+  <main id="menu" aria-labelledby="menu-title">
+    <div class="intro">
+      <p class="eyebrow" id="menu-kicker">A FOREST RYOKAN · BROWSER EDITION</p>
+      <h1 id="menu-title">Stay a little<br><em>longer.</em></h1>
+      <p id="menu-copy">Morning light. Warm timber. A valley of green.<br>Take one last walk through your ryokan, gather three belongings, and say goodbye from the balcony.</p>
+      <button class="primary" id="enter" disabled>Preparing your stay… <span>↗</span></button>
+      <p id="load-status" role="status">Loading the rooms and forest</p>
+      <div id="menu-actions" hidden><button id="restart">Start over</button><button class="quality">Quality: Balanced</button></div>
+    </div>
+    <div class="menu-foot"><span>01 — SLOW DOWN & EXPLORE</span><span>WASD to walk · Mouse to look · Space to jump · E to collect</span></div>
+  </main>
+  <section id="hud" hidden aria-label="Game status">
+    <div class="location"><span class="eyebrow">YOUR STAY</span><h2 id="room">Timber corridor</h2></div>
+    <div class="belongings glass"><div><span id="objective-title">Before you leave</span><strong id="counter">0 / 3</strong></div><ul><li data-item="TeaCup"><span>○</span> Tea cup <small>Dining room</small></li><li data-item="BathTowel"><span>○</span> Bath towel <small>Bath stool</small></li><li data-item="RoomKey"><span>○</span> Room key <small>Bedroom</small></li></ul><p id="next-step">Find your three belongings.</p></div>
+    <div id="crosshair" aria-hidden="true"></div>
+    <div id="prompt" role="status" hidden></div>
+    <div id="toast" role="status"></div>
+    <div class="controls glass"><kbd>W A S D</kbd> Walk <span>·</span> <kbd>Shift</kbd> Sprint <span>·</span> <kbd>Space</kbd> Jump <span>·</span> <kbd>E</kbd> Collect <span>·</span> <kbd>M</kbd> Map</div>
+    <div id="map" class="glass"><div class="map-title">THE SUITE <span>N ↑</span></div><svg viewBox="0 0 160 165" role="img" aria-label="Floor plan with your current location"><g fill="#ecdfbb" fill-opacity=".06" stroke="#ecdfbb" stroke-opacity=".48"><rect x="12" y="12" width="136" height="20"/><rect x="12" y="32" width="48" height="50"/><rect x="60" y="32" width="66" height="50"/><rect x="12" y="82" width="48" height="65"/><rect x="60" y="82" width="66" height="65"/><rect x="126" y="32" width="22" height="115"/></g><g class="map-label"><text x="80" y="25">BALCONY</text><text x="36" y="60">LOUNGE</text><text x="92" y="60">BATH</text><text x="36" y="118">BED</text><text x="92" y="118">DINING</text></g><circle id="map-player" r="3.4" fill="#efd397" stroke="#17261f" stroke-width="1.5"/></svg></div>
+    <div id="touch-controls"><div class="touch-pad"><button data-move="KeyW" aria-label="Walk forward">↑</button><div><button data-move="KeyA" aria-label="Walk left">←</button><button data-move="KeyS" aria-label="Walk backward">↓</button><button data-move="KeyD" aria-label="Walk right">→</button></div></div><button id="touch-use">Collect</button></div>
+  </section>
+  <noscript>This experience needs JavaScript enabled and a browser with WebGL 2.</noscript>
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
