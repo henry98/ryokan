@@ -5,9 +5,12 @@ import { Walker } from './physics.js';
 const $ = s => document.querySelector(s);
 const canvas = $('#world'), menu = $('#menu'), hud = $('#hud'), enter = $('#enter');
 const testMode = new URLSearchParams(location.search).has('test');
-const coarse = matchMedia('(pointer: coarse)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+document.body.classList.toggle('touch-mode', coarse);
 let renderer, walker, model, ready = false, state = 'loading', yaw = Math.PI, pitch = 0;
-let quality = 1, toastUntil = 0, target = null, drag = null, previousTime = 0, elapsed = 0;
+let quality = coarse ? 0 : 1, toastUntil = 0, target = null, drag = null, previousTime = 0, elapsed = 0;
+const stick = {id: null, x: 0, z: 0};
+let touchRun = false;
 const keys = new Set(), found = new Set(), collectibles = [], blockers = [], waterMaps = [];
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#adb7a3');
@@ -35,7 +38,7 @@ function syncCamera() {
   camera.updateMatrixWorld();
 }
 function reset() {
-  found.clear(); keys.clear(); elapsed = 0;
+  found.clear(); clearInput(); elapsed = 0;
   target = null; toastUntil = 0; $('#toast').textContent = ''; $('#prompt').hidden = true;
   walker.x = 0; walker.z = 1.2; yaw = Math.PI; pitch = 0;
   walker.resetJump();
@@ -44,20 +47,21 @@ function reset() {
 }
 function updateObjectives() {
   $('#counter').textContent = `${found.size} / 3`;
+  $('#mobile-counter').textContent = `${found.size} / 3`;
   for (const [id] of Object.entries(labels)) {
     const li = $(`[data-item="${id}"]`); li.classList.toggle('found', found.has(id));
     li.querySelector('span').textContent = found.has(id) ? '✓' : '○';
   }
-  $('#next-step').textContent = found.size === 3 ? 'All packed. Step onto the balcony and press E at the golden marker.' : 'Find your three belongings.';
+  $('#next-step').textContent = found.size === 3 ? `All packed. Step onto the balcony and ${coarse ? 'tap Leave' : 'press E'} at the golden marker.` : 'Find your three belongings.';
   exitMarker.material.color.set(found.size === 3 ? '#ffe0a0' : '#aabbaa');
 }
 function showMenu(kind) {
-  state = kind; keys.clear(); target = null;
+  state = kind; clearInput(); target = null;
   if (document.pointerLockElement) document.exitPointerLock();
   menu.hidden = false; hud.hidden = true; $('#pause-button').hidden = true;
   document.body.classList.remove('playing');
   $('#menu-actions').hidden = false;
-  $('#load-status').textContent = 'WASD / arrows to walk · Mouse / drag to look · E to collect · Space to jump · Shift to sprint';
+  $('#load-status').textContent = coarse ? 'Left thumb to walk · Drag the scene to look · Tap Jump or Collect' : 'WASD / arrows to walk · Mouse / drag to look · E to collect · Space to jump · Shift to sprint';
   if (kind === 'won') {
     $('#menu-kicker').textContent = 'YOUR STAY IS COMPLETE';
     $('#menu-title').innerHTML = 'Until<br><em>next time.</em>';
@@ -76,6 +80,7 @@ async function play() {
   if (state === 'ready' || state === 'won') reset();
   state = 'playing'; menu.hidden = true; hud.hidden = false; $('#pause-button').hidden = false;
   document.body.classList.add('playing');
+  if (coarse) closePanels();
   if (!coarse && !testMode) {
     try { await canvas.requestPointerLock(); }
     catch { say('Click and drag to look. You can also use the arrow keys.'); }
@@ -110,9 +115,12 @@ function updateTarget() {
   if (Math.hypot(walker.x - exitPosition.x, walker.z - exitPosition.z) < 1.0) target = {id: 'exit'};
   const prompt = $('#prompt'); prompt.hidden = !target;
   $('#crosshair').classList.toggle('active', !!target);
+  $('#touch-use').classList.toggle('ready', !!target);
+  $('#touch-use').textContent = target?.id === 'exit' && found.size === 3 ? 'Leave' : 'Collect';
+  const actionKey = coarse ? '<span>Tap Collect</span>' : '<kbd>E</kbd>';
   if (target) prompt.innerHTML = target.id === 'exit'
-    ? (found.size === 3 ? '<kbd>E</kbd> Say goodbye to the valley' : `Gather your belongings first · ${found.size} / 3`)
-    : `<kbd>E</kbd> Take ${labels[target.id].toLowerCase()}`;
+    ? (found.size === 3 ? `${coarse ? 'Tap Leave ·' : '<kbd>E</kbd>'} Say goodbye to the valley` : `Gather your belongings first · ${found.size} / 3`)
+    : `${actionKey} · Take ${labels[target.id].toLowerCase()}`;
 }
 function interact() {
   if (state !== 'playing') return;
@@ -137,9 +145,10 @@ function step(dt) {
   if (keys.has('PageDown')) pitch = Math.max(-1.35, pitch - dt);
   let x = Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
   let z = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
+  x += stick.x; z += stick.z;
   const length = Math.hypot(x, z);
   if (length) {
-    const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 3.8 : 2.3) * dt / length;
+    const speed = (touchRun || keys.has('ShiftLeft') || keys.has('ShiftRight') ? 3.8 : 2.3) * dt / Math.max(1, length);
     walker.move((Math.cos(yaw) * x - Math.sin(yaw) * z) * speed, (-Math.sin(yaw) * x - Math.cos(yaw) * z) * speed);
   }
   syncCamera(); updateTarget();
@@ -148,8 +157,9 @@ function step(dt) {
   $('#map-player').setAttribute('cy', 12 + (11 - walker.z) * 10);
 }
 function resize() {
+  clearInput();
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  if (renderer) { renderer.setPixelRatio(Math.min(devicePixelRatio, [.85, 1.25, 2][quality])); renderer.setSize(innerWidth, innerHeight); }
+  if (renderer) { renderer.setPixelRatio(Math.min(devicePixelRatio, (coarse ? [1, 1.25, 1.5] : [.85, 1.25, 2])[quality])); renderer.setSize(innerWidth, innerHeight); }
 }
 function setQuality() {
   quality = (quality + 1) % 3;
@@ -180,7 +190,8 @@ async function init() {
     renderer = new THREE.WebGLRenderer({canvas, antialias: true, powerPreference: 'high-performance'});
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = quality > 0; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    $('.quality').textContent = `Quality: ${['Low', 'Balanced', 'High'][quality]}`;
     resize();
     scene.add(new THREE.HemisphereLight('#e0e8cd', '#796447', 2.0));
     const sun = new THREE.DirectionalLight('#ffe5b1', 2.4);
@@ -224,7 +235,7 @@ async function init() {
     // Compile once before enabling play to reduce the initial shader hitch.
     await renderer.compileAsync(scene, camera);
     enter.disabled = false; enter.innerHTML = 'Enter the ryokan <span>↗</span>';
-    $('#load-status').textContent = 'No rush. There is no timer.';
+    $('#load-status').textContent = coarse ? 'Thumb stick to walk · Drag to look · Portrait or landscape' : 'No rush. There is no timer.';
     requestAnimationFrame(frame);
     if (testMode) installTestAPI();
   } catch (e) { fail(e); }
@@ -233,9 +244,45 @@ enter.onclick = play;
 $('#pause-button').onclick = () => showMenu('paused');
 $('#restart').onclick = () => { reset(); play(); };
 $('.quality').onclick = setQuality;
-$('#touch-use').onclick = interact;
+function bindTouchAction(selector, action) {
+  const button = $(selector);
+  button.addEventListener('pointerdown', e => { e.preventDefault(); action(); });
+  // Keep keyboard/assistive activation without repeating a physical tap.
+  button.onclick = e => { if (e.detail === 0) action(); };
+}
+bindTouchAction('#touch-use', interact);
+bindTouchAction('#touch-jump', () => { if (state === 'playing') walker.jump(); });
+bindTouchAction('#touch-run', () => {
+  if (state !== 'playing') return;
+  touchRun = !touchRun; $('#touch-run').setAttribute('aria-pressed', String(touchRun));
+});
+function closePanels() {
+  document.body.classList.remove('bag-open', 'map-open');
+  $('#bag-toggle').setAttribute('aria-expanded', 'false');
+  $('#map-toggle').setAttribute('aria-expanded', 'false');
+}
+for (const kind of ['bag', 'map']) {
+  $(`#${kind}-toggle`).onclick = () => {
+    const open = !document.body.classList.contains(`${kind}-open`);
+    closePanels(); clearInput();
+    if (open) { document.body.classList.add(`${kind}-open`); $(`#${kind}-toggle`).setAttribute('aria-expanded', 'true'); }
+  };
+}
+function resetStick() {
+  const id = stick.id; stick.id = null; stick.x = 0; stick.z = 0;
+  const joystick = $('#joystick');
+  if (id !== null && joystick.hasPointerCapture(id)) joystick.releasePointerCapture(id);
+  $('#joystick-knob').style.transform = 'translate(-50%, -50%)';
+  joystick.classList.remove('active');
+}
+function clearInput() {
+  keys.clear(); resetStick();
+  if (drag && canvas.hasPointerCapture(drag.id)) canvas.releasePointerCapture(drag.id);
+  drag = null; touchRun = false;
+  $('#touch-run').setAttribute('aria-pressed', 'false');
+}
 addEventListener('resize', resize);
-addEventListener('blur', () => { keys.clear(); if (state === 'playing') showMenu('paused'); });
+addEventListener('blur', () => { clearInput(); if (state === 'playing') showMenu('paused'); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') showMenu('paused'); });
 document.addEventListener('pointerlockchange', () => {
   if (!document.pointerLockElement && state === 'playing' && !testMode) showMenu('paused');
@@ -258,24 +305,42 @@ function look(dx, dy) {
 }
 document.addEventListener('mousemove', e => { if (state === 'playing' && document.pointerLockElement === canvas) look(e.movementX, e.movementY); });
 canvas.addEventListener('pointerdown', e => {
-  if (state !== 'playing' || document.pointerLockElement) return;
+  if (state !== 'playing' || document.pointerLockElement || drag) return;
+  e.preventDefault();
   drag = {id:e.pointerId,x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove', e => {
   if (!drag || drag.id !== e.pointerId || state !== 'playing') return;
-  look(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY;
+  const scale = e.pointerType === 'touch' ? 1.7 : 1;
+  look((e.clientX - drag.x) * scale, (e.clientY - drag.y) * scale); drag.x = e.clientX; drag.y = e.clientY;
 });
-canvas.addEventListener('pointerup', () => { drag = null; });
-canvas.addEventListener('pointercancel', () => { drag = null; });
-for (const b of document.querySelectorAll('[data-move]')) {
-  b.addEventListener('pointerdown', e => { e.preventDefault(); keys.add(b.dataset.move); b.setPointerCapture(e.pointerId); });
-  for (const event of ['pointerup','pointercancel','lostpointercapture']) b.addEventListener(event, () => keys.delete(b.dataset.move));
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  canvas.addEventListener(event, e => { if (drag?.id === e.pointerId) drag = null; });
 }
+const joystick = $('#joystick');
+function updateStick(e) {
+  const rect = joystick.getBoundingClientRect(), radius = rect.width * .32;
+  const dx = e.clientX - rect.left - rect.width / 2, dy = e.clientY - rect.top - rect.height / 2;
+  const length = Math.hypot(dx, dy), amount = Math.min(1, length / radius);
+  const strength = Math.max(0, (amount - .12) / .88);
+  stick.x = length ? dx / length * strength : 0;
+  stick.z = length ? -dy / length * strength : 0;
+  const px = length ? dx / length * amount * radius : 0, py = length ? dy / length * amount * radius : 0;
+  $('#joystick-knob').style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
+}
+joystick.addEventListener('pointerdown', e => {
+  if (state !== 'playing' || stick.id !== null) return;
+  e.preventDefault(); stick.id = e.pointerId; joystick.setPointerCapture(e.pointerId);
+  joystick.classList.add('active'); updateStick(e);
+});
+joystick.addEventListener('pointermove', e => { if (stick.id === e.pointerId) updateStick(e); });
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) joystick.addEventListener(event, e => { if (stick.id === e.pointerId) resetStick(); });
+for (const element of [canvas, joystick, $('#touch-controls')]) element.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); fail(new Error('Graphics context lost. Reload to start again.')); });
 function installTestAPI() {
   // Explicit developer mode only; used by the reproducible browser smoke test.
   window.komorebiTest = {
-    snapshot: () => ({state, found:[...found], position:[walker.x,1.62+walker.height,walker.z], grounded:walker.grounded, verticalSpeed:walker.verticalSpeed, yaw, pitch, room:roomName(), target:target?.id, triangles:renderer.info.render.triangles, draws:renderer.info.render.calls}),
+    snapshot: () => ({state, found:[...found], position:[walker.x,1.62+walker.height,walker.z], grounded:walker.grounded, verticalSpeed:walker.verticalSpeed, yaw, pitch, touch:coarse, stick:[stick.x,stick.z], touchRun, quality, room:roomName(), target:target?.id, triangles:renderer.info.render.triangles, draws:renderer.info.render.calls}),
     teleport: (x,z,lookAt) => { walker.x=x; walker.z=z; walker.resetJump(); syncCamera(); if (lookAt) { camera.lookAt(...lookAt); yaw=camera.rotation.y; pitch=camera.rotation.x; } updateTarget(); },
     advance: (seconds, codes=[]) => { keys.clear(); codes.forEach(c=>keys.add(c)); for(let t=0;t<seconds;t+=1/60) step(Math.min(1/60,seconds-t)); keys.clear(); },
     colliders: () => walker.boxes,

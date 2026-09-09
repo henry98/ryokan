@@ -49,7 +49,21 @@ Open `http://127.0.0.1:8080`. Stop the server with Ctrl+C.
 | Arrow keys | Forward/backward and turn |
 | Page Up / Page Down | Look up/down without a mouse |
 
-The pause menu offers Low, Balanced and High quality. Touch layouts provide movement buttons, drag-to-look and a Collect button. Desktop Chrome was tested; physical phone performance and Safari/Firefox are unverified. A WebGL 2 capable browser and hardware acceleration are required. There is no saved progress or audio.
+The pause menu offers Low, Balanced and High quality. A WebGL 2 capable browser and hardware acceleration are required. There is no saved progress or audio.
+
+### Phone and tablet controls
+
+The interface detects touch devices automatically and works in portrait or landscape. Refresh the page after an update to load the latest controls.
+
+- Drag the **left thumb stick** to walk. Small movements walk slowly; move it farther to walk at full speed.
+- Drag anywhere on the **scene** with your other thumb to look. Both thumbs work at the same time.
+- Tap **Run** to toggle sprint, **Jump** to jump, and **Collect** when looking at a nearby golden marker. The button changes to **Leave** at the exit after all three items are collected.
+- Tap **Bag** for the item hints or **Map** for the floor plan. Tap the same button again to close it.
+- Tap **Pause** to continue later, start over, or change graphics quality.
+
+Controls avoid phone notches and the home indicator. Rotation, paused/background state, and cancelled touches clear movement to prevent stuck controls. Touch devices start on **Low** graphics (no realtime shadows, capped render resolution); raise quality from Pause if your phone runs smoothly.
+
+Chrome mobile emulation verifies real multi-touch event input, portrait/landscape layouts down to 320 px width, simulated safe areas, pickups, jumping, ending and restart. Desktop Chrome was also tested. Physical phone performance and actual iOS Safari/Android hardware remain unverified.
 
 ## Editing
 
