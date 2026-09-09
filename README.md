@@ -22,7 +22,7 @@ git remote add origin https://github.com/YOUR-USER/YOUR-REPOSITORY.git
 git push -u origin main
 ```
 
-Deployment repository: [henry98/ryokan](https://github.com/henry98/ryokan). The configured Pages URL is `https://henry98.github.io/ryokan/`.
+Deployment repository: [henry98/ryokan](https://github.com/henry98/ryokan). The intended Pages URL is `https://henry98.github.io/ryokan/`.
 
 ## Preview locally
 
